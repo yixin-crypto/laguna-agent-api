@@ -1,0 +1,95 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Agent who earns commissions (identified by wallet address)
+model Agent {
+  id            String   @id @default(uuid())
+  walletAddress String   @unique // ERC-20 wallet address
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  links         AgentLink[]
+  rewards       AgentReward[]
+
+  @@index([walletAddress])
+}
+
+// Affiliate link generated for an agent
+model AgentLink {
+  id              String    @id @default(uuid())
+  agentId         String
+  agent           Agent     @relation(fields: [agentId], references: [id])
+
+  merchantId      String    // Reference to merchant in Laguna backend
+  merchantName    String
+  merchantSlug    String
+
+  subId           String    @unique // Unique tracking ID embedded in affiliate link
+  trackingUrl     String    // The generated affiliate link
+  cashbackRate    Float     // USDT cashback percentage at time of creation
+
+  // Stats
+  clickCount      Int       @default(0)
+  lastClickAt     DateTime?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  rewards         AgentReward[]
+
+  @@index([agentId])
+  @@index([subId])
+  @@index([merchantId])
+}
+
+// Commission/reward from a purchase
+model AgentReward {
+  id              String        @id @default(uuid())
+  agentId         String
+  agent           Agent         @relation(fields: [agentId], references: [id])
+  linkId          String
+  link            AgentLink     @relation(fields: [linkId], references: [id])
+
+  // Order info from postback
+  orderId         String?       // External order ID from merchant
+  orderAmount     Float         // Order value in original currency
+  orderCurrency   String        // Original currency (USD, SGD, etc.)
+
+  // Commission
+  commissionUsdt  Float         // Commission amount in USDT
+
+  // Status tracking
+  status          RewardStatus  @default(PENDING)
+  statusHistory   Json?         // Array of status changes with timestamps
+
+  // Payout info (when paid)
+  txHash          String?       // Blockchain transaction hash
+  paidAt          DateTime?
+
+  // Postback data
+  postbackData    Json?         // Raw postback data for debugging
+  postbackSource  String?       // Which affiliate network (impact, rakuten, etc.)
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([agentId])
+  @@index([linkId])
+  @@index([status])
+  @@index([orderId])
+}
+
+enum RewardStatus {
+  NOT_TRACKED   // Click recorded but no purchase yet
+  PENDING       // Purchase detected, awaiting merchant confirmation
+  COMMISSIONED  // Confirmed by merchant, USDT credited
+  PAID          // USDT sent to wallet
+  CANCELLED     // Order cancelled or returned
+}
