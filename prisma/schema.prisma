@@ -32,7 +32,8 @@ model AgentLink {
   merchantSlug    String
 
   subId           String    @unique // Unique tracking ID embedded in affiliate link
-  trackingUrl     String    // The generated affiliate link
+  trackingUrl     String    // The full affiliate link (long)
+  shortCode       String    @unique // Short URL code (e.g., "abc123")
   cashbackRate    Float     // USDT cashback percentage at time of creation
 
   // Stats
@@ -46,6 +47,7 @@ model AgentLink {
 
   @@index([agentId])
   @@index([subId])
+  @@index([shortCode])
   @@index([merchantId])
 }
 

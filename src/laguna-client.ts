@@ -163,6 +163,32 @@ class LagunaBackendClient {
   }
 
   /**
+   * List all available merchant categories
+   */
+  async listCategories(): Promise<string[]> {
+    const result = await this.searchMerchants({ perPage: 100 })
+    const categories = new Set<string>()
+    for (const m of result.merchants) {
+      if (m.category) categories.add(m.category)
+    }
+    return Array.from(categories).sort()
+  }
+
+  /**
+   * Get the merchant with the highest USDT cashback rate in a category
+   */
+  async getTopMerchantByCategory(category: string): Promise<Merchant | null> {
+    const result = await this.searchMerchants({ category, perPage: 100 })
+    if (result.merchants.length === 0) return null
+
+    return result.merchants.reduce((best, m) => {
+      const bestRate = best.cashbackRates[0]?.cashbackPercent || best.cashbackRates[0]?.cashbackAmount || 0
+      const mRate = m.cashbackRates[0]?.cashbackPercent || m.cashbackRates[0]?.cashbackAmount || 0
+      return mRate > bestRate ? m : best
+    })
+  }
+
+  /**
    * Generate tracking link via Laguna backend
    * This calls the user/link-refer endpoint with a virtual user
    */
@@ -175,6 +201,41 @@ class LagunaBackendClient {
     })
 
     return response.data?.linkTracking || response.linkTracking
+  }
+
+  /**
+   * Request USDT withdrawal to agent's wallet via the Laguna backend withdrawal manager.
+   * Called when a commission reaches PAID status.
+   *
+   * Uses the existing POST /api/user/request-withdraw-dynamic-v2 endpoint.
+   * The backend's OrderService.requestWithdrawDynamicV2 creates a transactionHistory
+   * record and queues the withdrawal job for processing.
+   */
+  async requestAgentWithdrawal(params: {
+    walletAddress: string
+    amountUsdt: number
+    rewardId: string
+  }): Promise<{ success: boolean; error?: string }> {
+    try {
+      await this.fetch<any>('/user/request-withdraw-dynamic-v2', {
+        method: 'POST',
+        body: JSON.stringify({
+          data: [
+            {
+              tokenId: 'USDT', // Resolved by backend via tokenInfo lookup
+              wallet: params.walletAddress,
+              quantity: params.amountUsdt.toString(),
+            },
+          ],
+          agentRewardId: params.rewardId,
+        }),
+      })
+      return { success: true }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Withdrawal request failed'
+      console.error(`Withdrawal failed for wallet ${params.walletAddress}:`, message)
+      return { success: false, error: message }
+    }
   }
 }
 

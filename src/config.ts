@@ -4,6 +4,9 @@ const envSchema = z.object({
   PORT: z.string().default('3100'),
   DATABASE_URL: z.string(),
 
+  // Short URL base (for affiliate link shortener)
+  SHORT_URL_BASE: z.string().default('https://go.laguna.network'),
+
   // Laguna Backend API (to fetch merchants and generate links)
   LAGUNA_BACKEND_URL: z.string().default('https://api.laguna.network'),
   LAGUNA_API_KEY: z.string().optional(),

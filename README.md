@@ -60,12 +60,47 @@ Response:
 }
 ```
 
-### GET /api/merchants
+### GET /api/merchants/search?name=...
 
-Search merchants with USDT cashback rates.
+Search for a specific merchant by name. Returns match or suggests the best alternative.
+
+**Path A: Agent knows the merchant name**
 
 ```bash
-curl "http://localhost:3100/api/merchants?query=travel"
+curl "http://localhost:3100/api/merchants/search?name=Nike"
+```
+
+Response (matched):
+```json
+{
+  "success": true,
+  "data": {
+    "matched": true,
+    "merchant": { "id": "nike", "name": "Nike", "category": "Fashion", "cashbackRateUsdt": 3.5 }
+  }
+}
+```
+
+Response (not matched — suggests best in similar category):
+```json
+{
+  "success": true,
+  "data": {
+    "matched": false,
+    "suggestion": {
+      "message": "We don't have \"XYZ\". Here's the top merchant in Fashion:",
+      "merchant": { "id": "nike", "name": "Nike", "category": "Fashion", "cashbackRateUsdt": 3.5 }
+    }
+  }
+}
+```
+
+### GET /api/merchants/categories
+
+**Path B: Agent doesn't know the merchant** — list all categories first.
+
+```bash
+curl http://localhost:3100/api/merchants/categories
 ```
 
 Response:
@@ -73,17 +108,26 @@ Response:
 {
   "success": true,
   "data": {
-    "merchants": [
-      {
-        "id": "trip-com",
-        "name": "Trip.com",
-        "category": "Travel",
-        "cashbackRateUsdt": 4.5
-      }
-    ],
-    "total": 1,
-    "page": 1,
-    "perPage": 20
+    "categories": ["Fashion", "Food & Drink", "Travel"],
+    "hint": "Pick a category, then call GET /api/merchants/top?category=<category>"
+  }
+}
+```
+
+### GET /api/merchants/top?category=...
+
+Get the merchant with the highest USDT cashback rate in a category.
+
+```bash
+curl "http://localhost:3100/api/merchants/top?category=Travel"
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "merchant": { "id": "trip-com", "name": "Trip.com", "category": "Travel", "cashbackRateUsdt": 4.5 }
   }
 }
 ```
@@ -106,11 +150,21 @@ Response:
     "linkId": "uuid",
     "merchantName": "Trip.com",
     "cashbackRate": "4.5% USDT",
-    "affiliateLink": "https://sg.trip.com/?...",
+    "affiliateLink": "https://go.laguna.network/abc123X",
+    "fullLink": "https://sg.trip.com/?affiliate_id=...",
     "walletAddress": "0x1234...",
     "subId": "agent_12345678_abc123_xyz"
   }
 }
+```
+
+### GET /api/go/:code
+
+Redirect short URL to full affiliate link. Tracks click count for analytics.
+
+```bash
+curl -L http://localhost:3100/api/go/abc123X
+# → Redirects to full affiliate URL (e.g., https://sg.trip.com/?...)
 ```
 
 ### GET /api/links
@@ -230,6 +284,7 @@ The Laguna backend should forward postbacks to `/api/webhooks/postback` when:
 |----------|-------------|----------|
 | `PORT` | Server port (default: 3100) | No |
 | `DATABASE_URL` | PostgreSQL connection string | Yes |
+| `SHORT_URL_BASE` | Base URL for short links (default: https://go.laguna.network) | No |
 | `LAGUNA_BACKEND_URL` | Main Laguna API URL | Yes |
 | `LAGUNA_API_KEY` | API key for Laguna backend | No |
 
